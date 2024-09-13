@@ -1,16 +1,9 @@
 #include<LiquidCrystal.h>
 #include <Arduino.h>
 LiquidCrystal lcd(11, 10, 9, 8, 7, 6);
-/*
-  za dodat:
 
-  -konec igre (se pokazejo rdece led)
-  (-rocno nastavljanje tudi 2. casa)
-  -dodatek za cas pri rocnem nastavljanju + na izbranih casih
-
-*/
-enum stanje {izbira_igre, rocno_nastavljanje_casa, potek_igre, konec_igre};
-int korak = 0;
+enum stanje {select_mode, manual_time_set, game_phase, end_phase};
+int step = 0;
 int OK = 4;
 int plus = 5;
 int buttonState1, buttonState2;
@@ -21,295 +14,275 @@ long int passedTime2 = 0;
 long int currentTime = 0;
 long int previousTime1 = 0;
 long int previousTime2 = 0;
-long int cas1;
-long int cas2;
-long int prejsnji_cas1;
-long int prejsnji_cas2;
+long int time_p1;
+long int time_p2;
+long int previous_time_p1;
+long int previous_time_p2;
 long int lastTime = 0;
-long int dodatek = 3000;
-int minutaza = 0;
-int sekunde = 0;
-int ure = 0;
-int stetje = 0;
-int igralni_cas;
+long int increment = 3000;
+int time_minutes = 0;
+int time_seconds = 0;
+int time_hours = 0;
+int counting = 0;
+int playing_time;
 
 void setup() {
   lcd.begin(16, 2);
   Serial.begin(9600);
-  pinMode (2, OUTPUT);//zelena led
-  pinMode (13, OUTPUT);//zelena led
-  pinMode (A4, OUTPUT);//rdeca led
-  pinMode (A5, OUTPUT);//rdeca led
+  pinMode (2, OUTPUT);//green led
+  pinMode (13, OUTPUT);//green led
+  pinMode (A4, OUTPUT);//red led
+  pinMode (A5, OUTPUT);//red led
   pinMode (3, INPUT_PULLUP);//button
   pinMode (12, INPUT_PULLUP);//button
-  pinMode(OK, INPUT);  //gumb ok
-  pinMode(plus, INPUT);//gumb_zvisaj
+  pinMode(OK, INPUT);  //confirm button
+  pinMode(plus, INPUT);//increment button
 }
 void izpis() {
   lcd.setCursor(0, 0);
   lcd.print("Player1  Player2");
-  if ((cas1 >= 0) && (cas2 >= 0)) {
-    //cas1
+  if ((time_p1 >= 0) && (time_p2 >= 0)) {
+    //time_p1
     lcd.setCursor(0, 1);
-    if ( cas1 >= 3600000) {
-      //Serial.print("igralec 1: ");
+    if ( time_p1 >= 3600000) {
       lcd.print(" ");
-      lcd.print(cas1 / 3600000);
-      //Serial.print(cas1/3600000UL);
+      lcd.print(time_p1 / 3600000);
       lcd.print("h ");
-      //Serial.print("h ");
-      if (((cas1 % 3600000) / 60000) < 10) {
+      if (((time_p1 % 3600000) / 60000) < 10) {
         lcd.print(" ");
       }
-      lcd.print((cas1 % 3600000) / 60000);
-      //Serial.print((cas1%3600000UL)/1000UL);
+      lcd.print((time_p1 % 3600000) / 60000);
       lcd.print("'");
-      //Serial.print("'    ");
     }
 
-    if ( cas1 < 3600000) {
-      //Serial.print("igralec 1: ");
-      if ((cas1 / 60000) < 10) {
+    if ( time_p1 < 3600000) {
+      if ((time_p1 / 60000) < 10) {
         lcd.print(" ");
       }
-      lcd.print(cas1 / 60000);
-      //Serial.print(cas1/60000UL);
+      lcd.print(time_p1 / 60000);
       lcd.print("' ");
-      //Serial.print("' ");
-      if (((cas1 % 60000) / 1000) < 10) {
+      if (((time_p1 % 60000) / 1000) < 10) {
         lcd.print(" ");
       }
-      lcd.print((cas1 % 60000) / 1000);
-      //Serial.print((cas1%60000UL)/1000UL);
+      lcd.print((time_p1 % 60000) / 1000);
       lcd.print("\"");
-      //Serial.print("\"  ");
     }
-    //cas2
+    //time_p2
     lcd.setCursor(9, 1);
-    if ( cas2 >= 3600000) {
-      //Serial.print("igralec 2: ");
+    if ( time_p2 >= 3600000) {
       lcd.print(" ");
-      lcd.print(cas2 / 3600000);
-      //Serial.print(cas2/3600000UL);
+      lcd.print(time_p2 / 3600000);
       lcd.print("h ");
-      //Serial.print("h ");
-      if (((cas2 % 3600000) / 60000) < 10) {
+      if (((time_p2 % 3600000) / 60000) < 10) {
         lcd.print(" ");
       }
-      lcd.print((cas2 % 3600000) / 60000);
-      //Serial.print((cas2%3600000UL)/1000UL);
+      lcd.print((time_p2 % 3600000) / 60000);
       lcd.print("'");
-      //Serial.print("'    ");
     }
 
-    if ( cas2 < 3600000) {
-      //Serial.print("igralec 2: ");
-      if ((cas2 / 60000) < 10) {
+    if ( time_p2 < 3600000) {
+      if ((time_p2 / 60000) < 10) {
         lcd.print(" ");
       }
-      lcd.print(cas2 / 60000);
-      //Serial.print(cas2/60000UL);
+      lcd.print(time_p2 / 60000);
       lcd.print("' ");
-      //Serial.print("' ");
-      if (((cas2 % 60000) / 1000) < 10) {
+      if (((time_p2 % 60000) / 1000) < 10) {
         lcd.print(" ");
       }
-      lcd.print((cas2 % 60000) / 1000);
-      //Serial.print((cas2%60000UL)/1000UL);
+      lcd.print((time_p2 % 60000) / 1000);
       lcd.print("\"");
-      //Serial.print("\"  ");
     }
 
 
-    //Serial.print("igralec 1: ");
-    //Serial.print(cas1/1000UL);
-    //Serial.print("     igralec 2: ");
-    //Serial.print(cas2/1000UL);
+    //Serial.print("Player 1: ");
+    //Serial.print(time_p1/1000UL);
+    //Serial.print("     player 2: ");
+    //Serial.print(time_p2/1000UL);
     //Serial.print("\n");
   }
 }
 
 void loop() {
 
-  switch (korak) {
-    case izbira_igre:
+  switch (step) {
+    case select_mode:
 
       if (digitalRead(plus) == HIGH) {
-        igralni_cas = igralni_cas + 1;
-        if (igralni_cas > 7) {
-          igralni_cas = 0;
+        playing_time = playing_time + 1;
+        if (playing_time > 7) {
+          playing_time = 0;
           lcd.clear();
           lcd.setCursor(2, 0);
         }
       }
 
       lcd.setCursor(2, 0);
-      switch (igralni_cas) {
+      switch (playing_time) {
         case 0:
 
           lcd.print("manual");
-          Serial.println("rocno nastavljanje");
+          Serial.println("manual");
           break;
         case 1:
-          cas1 = 60000;
+          time_p1 = 60000;
           lcd.print("1' + 0\"");
           Serial.println("1' + 0\"");
           break;
 
         case 2:
-          cas1 = 120000;
+          time_p1 = 120000;
           lcd.print("2' + 0\"");
           Serial.println("2' + 0\"");
           break;
 
         case 3:
-          cas1 = 300000;
+          time_p1 = 300000;
           lcd.print("5' + 0\"");
           Serial.println("5' + 0\"");
           break;
 
         case 4:
-          cas1 = 600000;
+          time_p1 = 600000;
           lcd.print("10' + 0\"");
           Serial.println("10' + 0\"");
           break;
 
         case 5:
-          cas1 = 900000;
+          time_p1 = 900000;
           lcd.print("15' + 0\"");
           Serial.println("15' + 0\"");
           break;
 
         case 6:
-          cas1 = 1800000;
+          time_p1 = 1800000;
           lcd.print("30' + 0\"");
           Serial.println("30' + 0\"");
           break;
 
         case 7:
-          cas1 = 3600000;
+          time_p1 = 3600000;
           lcd.print("60' + 0\"");
           Serial.println("60' + 0\"");
           break;
       }
       delay(200);
-      cas2 = cas1;
+      time_p2 = time_p1;
 
       if (digitalRead (OK) == HIGH) {
-        if (igralni_cas == 0) {
-          korak = rocno_nastavljanje_casa;
+        if (playing_time == 0) {
+          step = manual_time_set;
         }
         else {
-          korak = potek_igre;
+          step = game_phase;
         }
       }
       break;
-    case rocno_nastavljanje_casa:
+    case manual_time_set:
 
-      //_____________konec 1. zanke____________________________________
+      //_____________end of 1st loop____________________________________
       while (digitalRead (OK) == HIGH) {}
 
       lcd.setCursor(0, 0);
       lcd.print("        ");
-      //stevilo ur
-      stetje = 0;
+      //number of hours
+      counting = 0;
       while (digitalRead (OK) == LOW) {
         Serial.println();
         lcd.setCursor(0, 0);
-        lcd.print(stetje);
-        Serial.print(stetje);
+        lcd.print(counting);
+        Serial.print(counting);
         lcd.print(" h");
         Serial.print(" h");
         if (digitalRead (plus) == HIGH) {
 
-          stetje += 1;
-          if (stetje == 10) {
+          counting += 1;
+          if (counting == 10) {
             lcd.clear();
-            stetje = 0;
+            counting = 0;
 
           }
         }
         delay(200);
       }
-      ure =  stetje;
+      time_hours =  counting;
       while (digitalRead (OK) == HIGH) {
       }
 
-      //stevilo minut
-      stetje = 0;
+      //number of minutes
+      counting = 0;
       while (digitalRead (OK) == LOW) {
-        if (stetje < 10) {
+        if (counting < 10) {
           lcd.setCursor(0, 0);
           lcd.print(" ");
-          lcd.print(stetje);
+          lcd.print(counting);
         }
 
         else {
           lcd.setCursor(0, 0);
-          lcd.print(stetje);
+          lcd.print(counting);
         }
 
         Serial.println();
-        Serial.print(stetje);
+        Serial.print(counting);
         lcd.setCursor(2, 0);
         lcd.print(" min");
         Serial.print(" min");
         if (digitalRead (plus) == HIGH) {
 
-          stetje += 1;
-          if (stetje == 60) {
+          counting += 1;
+          if (counting == 60) {
 
-            stetje = 0;
+            counting = 0;
           }
 
         }
 
         delay(200);
       }
-      minutaza = stetje;
+      time_minutes = counting;
       while (digitalRead (OK) == HIGH) {};
-      //stevilo sekund
-      stetje = 0;
+      //number of seconds
+      counting = 0;
       lcd.setCursor(0, 0);
       lcd.print("             ");
       while (digitalRead (OK) == LOW) {
-        if (stetje < 10) {
+        if (counting < 10) {
           lcd.setCursor(0, 0);
           lcd.print(" ");
-          lcd.print(stetje);
+          lcd.print(counting);
         }
 
         else {
           lcd.setCursor(0, 0);
-          lcd.print(stetje);
+          lcd.print(counting);
         }
         Serial.println();
-        Serial.print(stetje);
+        Serial.print(counting);
         lcd.setCursor(2, 0);
         lcd.print(" s");
         Serial.print(" s");
         if (digitalRead (plus) == HIGH) {
 
-          stetje += 1;
-          if (stetje == 60) {
-            stetje = 0;
+          counting += 1;
+          if (counting == 60) {
+            counting = 0;
           }
         }
 
         delay(200);
       }
-      sekunde = stetje;
+      time_seconds = counting;
       if (digitalRead (OK) == HIGH) {
-        cas1 = (ure * 3600000 + minutaza * 60000 + sekunde * 1000);
-        cas2 = cas1;
-        korak = potek_igre;
+        time_p1 = (time_hours * 3600000 + time_minutes * 60000 + time_seconds * 1000);
+        time_p2 = time_p1;
+        step = game_phase;
       }
       break;
 
     //__________________________________________________
 
-    case potek_igre:
-      /*//dodatek
+    case game_phase:
+      /*//increment
         if (digitalRead(3)==LOW){
         buttonState1=1;
         }
@@ -322,17 +295,17 @@ void loop() {
         }
         else{buttonState2=0;}
         if ((buttonState1-lastbuttonState1)==1){
-        cas1=cas1+dodatek;}
+        time_p1=time_p1+increment;}
         if ((buttonState2-lastbuttonState2)==1){
-        cas2=cas2+dodatek;}
+        time_p2=time_p2+increment;}
       */
 
-      //1. primer
+      //1. case
       //______________________________________________________________
       if (digitalRead(12) == HIGH) {
         currentTime = millis();
         passedTime2 = currentTime - previousTime2;
-        cas2 = cas2 - passedTime2;//............................+dodatek na potezo
+        time_p2 = time_p2 - passedTime2;//............................+increment per move
         previousTime2 = currentTime;
         digitalWrite(2, HIGH);
       }
@@ -341,12 +314,12 @@ void loop() {
         previousTime2 = millis();
       }
 
-      //2. primer
+      //2. case
       //______________________________________________________________
       if (digitalRead(3) == HIGH) {
         currentTime = millis();
         passedTime1 = currentTime - previousTime1;
-        cas1 = cas1 - passedTime1;//...........................+dodatek na potezo
+        time_p1 = time_p1 - passedTime1;//...........................+increment per move
         previousTime1 = currentTime;
         digitalWrite(13, HIGH);
       }
@@ -359,24 +332,23 @@ void loop() {
 
       izpis();
 
-      if (cas1 <= 0 || cas2 <= 0) {
-        korak = konec_igre;
+      if (time_p1 <= 0 || time_p2 <= 0) {
+        step = end_phase;
       }
       delay(100); //za boljse delovanje programa
       break;
-    case konec_igre:
-      //Serial.print(sekunde);
+    case end_phase:
+      //Serial.print(time_seconds);
       //Serial.print("\t");
-      //Serial.println(minutaza);
+      //Serial.println(time_minutes);
       digitalWrite(2, LOW);
       digitalWrite(13, LOW);
-      if (cas1 < 0)
+      if (time_p1 < 0)
         digitalWrite(A4, HIGH);
-      if (cas2 < 0)
+      if (time_p2 < 0)
         digitalWrite(A5, HIGH);
       lcd.setCursor(0, 1);
-      lcd.println("   KONEC IGRE      ");
-      //Serial.println("konec igre");
+      lcd.println("   GAME OVER    ");
       delay(1);
       break;
   }
